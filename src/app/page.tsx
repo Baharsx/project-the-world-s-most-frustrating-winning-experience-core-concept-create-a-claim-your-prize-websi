@@ -155,7 +155,7 @@ export default function Home() {
 
   return (
     <>
-      {/* Custom cursors */}
+      {/* Custom cursors & animations */}
       <style jsx global>{`
         * {
           cursor: none !important;
@@ -174,6 +174,15 @@ export default function Home() {
         }
         .cursor-3 {
           transition: all 0.12s ease-out;
+        }
+        @keyframes blink {
+          0%,
+          100% {
+            opacity: 1;
+          }
+          50% {
+            opacity: 0.3;
+          }
         }
       `}</style>
 
@@ -531,18 +540,6 @@ export default function Home() {
         >
           ↓ SCROLL DOWN TO CLAIM YOUR PRIZE ↓
         </div>
-
-        <style jsx>{`
-          @keyframes blink {
-            0%,
-            100% {
-              opacity: 1;
-            }
-            50% {
-              opacity: 0.3;
-            }
-          }
-        `}</style>
       </div>
     </>
   );
