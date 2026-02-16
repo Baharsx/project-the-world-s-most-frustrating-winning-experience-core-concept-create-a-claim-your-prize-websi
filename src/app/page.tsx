@@ -1,12 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, FormEvent } from "react";
+
+// Random emojis for Schrödinger's Textbox
+const RANDOM_EMOJIS = ["💀", "🔥", "💩", "👻", "👽", "🤡", "💩", "😈", "👺", "🤮", "😱", "🆘"];
 
 export default function Home() {
   const buttonRef = useRef<HTMLButtonElement>(null);
   const [progress, setProgress] = useState(0);
   const [audioStarted, setAudioStarted] = useState(false);
   const [cursorPosition, setCursorPosition] = useState({ x: 0, y: 0 });
+  const [spinnerOffset, setSpinnerOffset] = useState({ x: 17, y: 17 });
   const [fakeCursors, setFakeCursors] = useState([
     { x: 0, y: 0, delay: 0 },
     { x: 0, y: 0, delay: 50 },
@@ -16,50 +20,155 @@ export default function Home() {
     Array(9).fill(false)
   );
   const [showCaptcha, setShowCaptcha] = useState(false);
+  const [showSystemError, setShowSystemError] = useState(false);
+  const [rotation, setRotation] = useState(0);
+  const [baseFontSize, setBaseFontSize] = useState(16);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const emailInputRef = useRef<HTMLInputElement>(null);
+  const [nameValue, setNameValue] = useState("");
+  const [emailValue, setEmailValue] = useState("");
 
-  // Audio torture - high pitch sine wave
+  // Anti-Exit Deterrent
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "Warning: Your prize is 99% calculated. Leaving now will donate your winnings to the 'Society of People Who Build Terrible Websites'. Are you sure?";
+      return e.returnValue;
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, []);
+
+  // Anti-Responsive - fonts get smaller as window gets larger
+  useEffect(() => {
+    const handleResize = () => {
+      const newSize = Math.max(8, 24 - (window.innerWidth / 50));
+      setBaseFontSize(newSize);
+      document.documentElement.style.setProperty("--base-font-size", `${newSize}px`);
+    };
+
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  // High-Frequency Ghost Audio - 15kHz beep, 1s on/3s off
   useEffect(() => {
     if (!audioStarted) return;
 
     const audioContext = new (window.AudioContext ||
       (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+    
+    // Main torture oscillator (existing 1kHz)
     const oscillator = audioContext.createOscillator();
     const gainNode = audioContext.createGain();
-
     oscillator.connect(gainNode);
     gainNode.connect(audioContext.destination);
-
     oscillator.type = "sine";
     oscillator.frequency.setValueAtTime(1000, audioContext.currentTime);
     gainNode.gain.setValueAtTime(0.15, audioContext.currentTime);
-
     oscillator.start();
 
-    // Warbling effect - pitch changes every 2 seconds
+    // Ghost audio - 15kHz high frequency
+    const ghostOscillator = audioContext.createOscillator();
+    const ghostGain = audioContext.createGain();
+    ghostOscillator.connect(ghostGain);
+    ghostGain.connect(audioContext.destination);
+    ghostOscillator.type = "sine";
+    ghostOscillator.frequency.setValueAtTime(15000, audioContext.currentTime);
+    ghostGain.gain.setValueAtTime(0.08, audioContext.currentTime);
+
+    // Pulse: 1 second on, 3 seconds off
+    const pulseGhost = () => {
+      ghostOscillator.start();
+      ghostGain.gain.setValueAtTime(0.08, audioContext.currentTime);
+      setTimeout(() => {
+        ghostGain.gain.setValueAtTime(0, audioContext.currentTime);
+      }, 1000);
+    };
+
+    pulseGhost();
+    const pulseInterval = setInterval(pulseGhost, 4000);
+
+    // Warbling effect on main oscillator
     const interval = setInterval(() => {
       const randomFreq = 950 + Math.random() * 100;
-      oscillator.frequency.setValueAtTime(
-        randomFreq,
-        audioContext.currentTime
-      );
+      oscillator.frequency.setValueAtTime(randomFreq, audioContext.currentTime);
     }, 2000);
 
     return () => {
       oscillator.stop();
+      ghostOscillator.stop();
       clearInterval(interval);
+      clearInterval(pulseInterval);
       audioContext.close();
     };
   }, [audioStarted]);
+
+  // Fake System Error Loop - every 30 seconds
+  useEffect(() => {
+    if (!audioStarted) return;
+
+    const errorInterval = setInterval(() => {
+      setShowSystemError(true);
+    }, 30000);
+
+    return () => clearInterval(errorInterval);
+  }, [audioStarted]);
+
+  // Handle system error buttons
+  const handleFixNow = () => {
+    for (let i = 0; i < 10; i++) {
+      window.open("about:blank", "_blank");
+    }
+    setShowSystemError(false);
+  };
+
+  const handleIgnore = () => {
+    setShowSystemError(false);
+    const rotateInterval = setInterval(() => {
+      setRotation((prev) => {
+        if (prev >= 90) {
+          clearInterval(rotateInterval);
+          return 90;
+        }
+        return prev + 1;
+      });
+    }, 1000);
+  };
+
+  // Gaslighting Mouse Cursor - offset spinner
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      setCursorPosition({ x: e.clientX, y: e.clientY });
+      
+      const offsetX = 17 + (Math.random() * 5 - 2.5);
+      const offsetY = 17 + (Math.random() * 5 - 2.5);
+      setSpinnerOffset({ x: offsetX, y: offsetY });
+
+      setFakeCursors((prev) =>
+        prev.map((cursor, i) => ({
+          ...cursor,
+          x: e.clientX + Math.sin(Date.now() / (200 + i * 100)) * (20 + i * 15),
+          y: e.clientY + Math.cos(Date.now() / (200 + i * 100)) * (20 + i * 15),
+        }))
+      );
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+    return () => document.removeEventListener("mousemove", handleMouseMove);
+  }, []);
 
   // Fake progress bar that goes backwards after 99%
   useEffect(() => {
     const interval = setInterval(() => {
       setProgress((prev) => {
         if (prev >= 99) {
-          return Math.max(0, prev - 0.0167); // Go backwards at ~1% per minute
+          return Math.max(0, prev - 0.0167);
         }
         if (prev < 99) {
-          return Math.min(99, prev + 0.825); // Reach 99% in ~2 seconds
+          return Math.min(99, prev + 0.825);
         }
         return prev;
       });
@@ -77,24 +186,6 @@ export default function Home() {
 
     document.addEventListener("wheel", handleWheel, { passive: false });
     return () => document.removeEventListener("wheel", handleWheel);
-  }, []);
-
-  // Multi-cursor tracking
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      setCursorPosition({ x: e.clientX, y: e.clientY });
-
-      setFakeCursors((prev) =>
-        prev.map((cursor, i) => ({
-          ...cursor,
-          x: e.clientX + Math.sin(Date.now() / (200 + i * 100)) * (20 + i * 15),
-          y: e.clientY + Math.cos(Date.now() / (200 + i * 100)) * (20 + i * 15),
-        }))
-      );
-    };
-
-    document.addEventListener("mousemove", handleMouseMove);
-    return () => document.removeEventListener("mousemove", handleMouseMove);
   }, []);
 
   // Shy button that runs away
@@ -153,10 +244,48 @@ export default function Home() {
     window.location.reload();
   };
 
+  // Schrödinger's Textbox - swap every 3rd character
+  const handleNameChange = (e: FormEvent<HTMLInputElement>) => {
+    const value = e.currentTarget.value;
+    let processed = "";
+    for (let i = 0; i < value.length; i++) {
+      if ((i + 1) % 3 === 0) {
+        if (Math.random() > 0.5) {
+          processed += RANDOM_EMOJIS[Math.floor(Math.random() * RANDOM_EMOJIS.length)];
+        } else {
+          continue;
+        }
+      } else {
+        processed += value[i];
+      }
+    }
+    setNameValue(processed);
+  };
+
+  const handleEmailChange = (e: FormEvent<HTMLInputElement>) => {
+    const value = e.currentTarget.value;
+    let processed = "";
+    for (let i = 0; i < value.length; i++) {
+      if ((i + 1) % 3 === 0) {
+        if (Math.random() > 0.5) {
+          processed += RANDOM_EMOJIS[Math.floor(Math.random() * RANDOM_EMOJIS.length)];
+        } else {
+          continue;
+        }
+      } else {
+        processed += value[i];
+      }
+    }
+    setEmailValue(processed);
+  };
+
   return (
     <>
       {/* Custom cursors & animations */}
       <style jsx global>{`
+        :root {
+          --base-font-size: 16px;
+        }
         * {
           cursor: none !important;
         }
@@ -175,16 +304,38 @@ export default function Home() {
         .cursor-3 {
           transition: all 0.12s ease-out;
         }
+        .spinner-cursor {
+          position: fixed;
+          pointer-events: none;
+          z-index: 10000;
+          width: 30px;
+          height: 30px;
+          border: 3px solid #00FF00;
+          border-top: 3px solid transparent;
+          border-radius: 50%;
+          animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
         @keyframes blink {
-          0%,
-          100% {
-            opacity: 1;
-          }
-          50% {
-            opacity: 0.3;
-          }
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.3; }
+        }
+        body {
+          font-size: var(--base-font-size);
         }
       `}</style>
+
+      {/* Gaslighting Offset Spinner Cursor */}
+      <div
+        className="spinner-cursor"
+        style={{
+          left: cursorPosition.x + spinnerOffset.x,
+          top: cursorPosition.y + spinnerOffset.y,
+        }}
+      />
 
       {/* Multiple fake cursors */}
       <div
@@ -218,6 +369,86 @@ export default function Home() {
         ◇
       </div>
 
+      {/* Fake System Error Modal */}
+      {showSystemError && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            backgroundColor: "rgba(0, 0, 0, 0.9)",
+            zIndex: 20000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "#1a1a2e",
+              border: "3px solid #e74c3c",
+              borderRadius: "8px",
+              padding: "30px",
+              maxWidth: "450px",
+              fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+            }}
+          >
+            <div
+              style={{
+                backgroundColor: "#e74c3c",
+                padding: "10px 15px",
+                borderRadius: "5px 5px 0 0",
+                margin: "-30px -30px 20px -30px",
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+              }}
+            >
+              <span style={{ fontSize: "20px" }}>⚠️</span>
+              <span style={{ color: "white", fontWeight: "bold", fontSize: "14px" }}>
+                System Error
+              </span>
+            </div>
+            <p style={{ color: "#ecf0f1", marginBottom: "20px", lineHeight: 1.6 }}>
+              A critical system error has been detected. Your computer may be at risk.
+              Error code: 0xDEADBEEF
+            </p>
+            <div style={{ display: "flex", gap: "15px", justifyContent: "center" }}>
+              <button
+                onClick={handleFixNow}
+                style={{
+                  backgroundColor: "#27ae60",
+                  color: "white",
+                  border: "none",
+                  padding: "12px 25px",
+                  borderRadius: "5px",
+                  cursor: "pointer",
+                  fontWeight: "bold",
+                }}
+              >
+                Fix Now
+              </button>
+              <button
+                onClick={handleIgnore}
+                style={{
+                  backgroundColor: "#7f8c8d",
+                  color: "white",
+                  border: "none",
+                  padding: "12px 25px",
+                  borderRadius: "5px",
+                  cursor: "pointer",
+                  fontWeight: "bold",
+                }}
+              >
+                Ignore
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 90s tiled background */}
       <div
         style={{
@@ -244,6 +475,8 @@ export default function Home() {
           minHeight: "200vh",
           padding: "20px",
           position: "relative",
+          transform: `rotate(${rotation}deg)`,
+          transition: "transform 1s ease-in-out",
         }}
       >
         {/* Chaotic overlapping elements */}
@@ -309,7 +542,7 @@ export default function Home() {
             backgroundColor: "rgba(0, 0, 0, 0.8)",
             padding: "40px",
             border: "10px solid #FF00FF",
-            borderRadius: "0",
+            borderRadius: 0,
           }}
         >
           <h1
@@ -371,6 +604,64 @@ export default function Home() {
             >
               LOADING PRIZE: {progress.toFixed(1)}%
             </span>
+          </div>
+
+          {/* Schrödinger's Textbox - Name and Email inputs */}
+          <div style={{ marginBottom: "30px" }}>
+            <div style={{ marginBottom: "15px" }}>
+              <label
+                style={{
+                  color: "#00FF00",
+                  display: "block",
+                  marginBottom: "5px",
+                  fontSize: "18px",
+                }}
+              >
+                Your Name:
+              </label>
+              <input
+                ref={nameInputRef}
+                type="text"
+                value={nameValue}
+                onChange={handleNameChange}
+                placeholder="Try to type your name..."
+                style={{
+                  width: "100%",
+                  padding: "15px",
+                  fontSize: "20px",
+                  backgroundColor: "#222",
+                  border: "3px solid #FF00FF",
+                  color: "#00FF00",
+                }}
+              />
+            </div>
+            <div style={{ marginBottom: "15px" }}>
+              <label
+                style={{
+                  color: "#00FF00",
+                  display: "block",
+                  marginBottom: "5px",
+                  fontSize: "18px",
+                }}
+              >
+                Email Address:
+              </label>
+              <input
+                ref={emailInputRef}
+                type="text"
+                value={emailValue}
+                onChange={handleEmailChange}
+                placeholder="Try to type your email..."
+                style={{
+                  width: "100%",
+                  padding: "15px",
+                  fontSize: "20px",
+                  backgroundColor: "#222",
+                  border: "3px solid #FF00FF",
+                  color: "#00FF00",
+                }}
+              />
+            </div>
           </div>
 
           {/* The Shy Button */}
@@ -499,46 +790,16 @@ export default function Home() {
               left: "-50px",
               backgroundColor: "#FF0000",
               color: "#00FF00",
-              padding: "50px",
-              fontSize: "40px",
-              transform: "rotate(15deg)",
-              zIndex: 5,
-            }}
-          >
-            ★★★★★★★★★★★
-          </div>
-
-          <div
-            style={{
-              position: "absolute",
-              bottom: "-150px",
-              right: "0",
-              backgroundColor: "#0000FF",
-              color: "#FF00FF",
-              padding: "30px",
-              fontSize: "28px",
-              transform: "rotate(-10deg)",
+              padding: "40px",
+              fontSize: "36px",
+              fontFamily: "Impact, sans-serif",
+              transform: "rotate(7deg)",
               zIndex: 4,
-              border: "5px double #FFFF00",
+              border: "8px dashed #FFFF00",
             }}
           >
-            LIMITED TIME ONLY!!!
+            ★★★ WINNER ★★★
           </div>
-        </div>
-
-        {/* Scrolling message */}
-        <div
-          style={{
-            marginTop: "100px",
-            backgroundColor: "#FF0000",
-            color: "#FFFF00",
-            padding: "20px",
-            fontSize: "24px",
-            textAlign: "center",
-            animation: "blink 0.5s infinite",
-          }}
-        >
-          ↓ SCROLL DOWN TO CLAIM YOUR PRIZE ↓
         </div>
       </div>
     </>
