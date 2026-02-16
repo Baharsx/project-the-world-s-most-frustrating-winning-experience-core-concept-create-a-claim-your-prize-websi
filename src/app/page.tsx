@@ -737,51 +737,6 @@ export default function Home() {
             </div>
           )}
 
-          {/* Navigation nightmare links */}
-          <div
-            style={{
-              marginTop: "40px",
-              textAlign: "center",
-            }}
-          >
-            <a
-              href="#"
-              onClick={handleLinkClick}
-              style={{
-                color: "#00FF00",
-                fontSize: "20px",
-                margin: "0 15px",
-                textDecoration: "underline",
-              }}
-            >
-              Terms of Service
-            </a>
-            <a
-              href="#"
-              onClick={handleLinkClick}
-              style={{
-                color: "#FFFF00",
-                fontSize: "20px",
-                margin: "0 15px",
-                textDecoration: "underline",
-              }}
-            >
-              Privacy Policy
-            </a>
-            <a
-              href="#"
-              onClick={handleLinkClick}
-              style={{
-                color: "#FF00FF",
-                fontSize: "20px",
-                margin: "0 15px",
-                textDecoration: "underline",
-              }}
-            >
-              Contact Support
-            </a>
-          </div>
-
           {/* More chaotic decorations */}
           <div
             style={{
