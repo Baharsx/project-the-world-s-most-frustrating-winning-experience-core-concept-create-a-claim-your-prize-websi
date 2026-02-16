@@ -27,6 +27,12 @@ export default function Home() {
   const emailInputRef = useRef<HTMLInputElement>(null);
   const [nameValue, setNameValue] = useState("");
   const [emailValue, setEmailValue] = useState("");
+  const [pendingNameInput, setPendingNameInput] = useState("");
+  const [buttonVisible, setButtonVisible] = useState(true);
+  const [buttonPosition, setButtonPosition] = useState({ x: 0, y: 0 });
+  const [captchaStates, setCaptchaStates] = useState<{ clicked: boolean; fled: boolean }[]>(
+    Array(9).fill({ clicked: false, fled: false })
+  );
 
   // Anti-Exit Deterrent
   useEffect(() => {
@@ -188,15 +194,21 @@ export default function Home() {
     return () => document.removeEventListener("wheel", handleWheel);
   }, []);
 
-  // Shy button that runs away
+  // Shy button that runs away AND becomes invisible when cursor gets too close
   useEffect(() => {
+    const button = buttonRef.current;
+    if (!button) return;
+
+    const rect = button.getBoundingClientRect();
+    setButtonPosition({ x: rect.left, y: rect.top });
+
     const handleMouseMove = (e: MouseEvent) => {
       if (!buttonRef.current) return;
 
-      const button = buttonRef.current.getBoundingClientRect();
+      const buttonRect = buttonRef.current.getBoundingClientRect();
       const buttonCenter = {
-        x: button.left + button.width / 2,
-        y: button.top + button.height / 2,
+        x: buttonRect.left + buttonRect.width / 2,
+        y: buttonRect.top + buttonRect.height / 2,
       };
 
       const distance = Math.sqrt(
@@ -204,7 +216,26 @@ export default function Home() {
           Math.pow(e.clientY - buttonCenter.y, 2)
       );
 
-      if (distance < 150) {
+      // If cursor is within 100px, make button invisible
+      if (distance < 100) {
+        setButtonVisible(false);
+        
+        // Teleport to random position after short delay
+        setTimeout(() => {
+          const newX = Math.random() * (window.innerWidth - 250);
+          const newY = Math.random() * (window.innerHeight - 80);
+          
+          if (buttonRef.current) {
+            buttonRef.current.style.position = "fixed";
+            buttonRef.current.style.left = `${Math.max(0, newX)}px`;
+            buttonRef.current.style.top = `${Math.max(0, newY)}px`;
+            buttonRef.current.style.opacity = "1";
+          }
+          setButtonPosition({ x: newX, y: newY });
+          setTimeout(() => setButtonVisible(true), 300);
+        }, 150);
+      } else if (distance < 150) {
+        // Original flee behavior for medium distance
         const angle = Math.atan2(
           buttonCenter.y - e.clientY,
           buttonCenter.x - e.clientX
@@ -212,12 +243,12 @@ export default function Home() {
         const moveX = Math.cos(angle) * 50;
         const moveY = Math.sin(angle) * 50;
 
-        const newX = button.left + moveX;
-        const newY = button.top + moveY;
+        const newX = buttonRect.left + moveX;
+        const newY = buttonRect.top + moveY;
 
         buttonRef.current.style.position = "fixed";
-        buttonRef.current.style.left = `${Math.max(0, Math.min(window.innerWidth - 200, newX))}px`;
-        buttonRef.current.style.top = `${Math.max(0, Math.min(window.innerHeight - 60, newY))}px`;
+        buttonRef.current.style.left = `${Math.max(0, Math.min(window.innerWidth - 250, newX))}px`;
+        buttonRef.current.style.top = `${Math.max(0, Math.min(window.innerHeight - 80, newY))}px`;
       }
     };
 
@@ -240,26 +271,48 @@ export default function Home() {
   };
 
   const handleCaptchaClick = (index: number) => {
-    alert("Incorrect. That square contained Despair. Try again.");
-    window.location.reload();
+    // Make the square show "Nope" and flee away
+    setCaptchaStates((prev) => {
+      const newStates = [...prev];
+      newStates[index] = { clicked: true, fled: true };
+      return newStates;
+    });
+    
+    // Force page reload after short delay to reset the torment
+    setTimeout(() => {
+      window.location.reload();
+    }, 1500);
   };
 
-  // Schrödinger's Textbox - swap every 3rd character
+  // Schrödinger's Textbox - swap every 3rd character + 2 second artificial lag
   const handleNameChange = (e: FormEvent<HTMLInputElement>) => {
     const value = e.currentTarget.value;
-    let processed = "";
-    for (let i = 0; i < value.length; i++) {
-      if ((i + 1) % 3 === 0) {
-        if (Math.random() > 0.5) {
-          processed += RANDOM_EMOJIS[Math.floor(Math.random() * RANDOM_EMOJIS.length)];
-        } else {
-          continue;
-        }
-      } else {
-        processed += value[i];
-      }
+    
+    // Store the pending input
+    setPendingNameInput(value);
+    
+    // Clear any existing timeout
+    if ((window as unknown as { nameTimeout?: NodeJS.Timeout }).nameTimeout) {
+      clearTimeout((window as unknown as { nameTimeout: NodeJS.Timeout }).nameTimeout);
     }
-    setNameValue(processed);
+    
+    // Set 2 second delay before showing typed characters
+    (window as unknown as { nameTimeout: NodeJS.Timeout }).nameTimeout = setTimeout(() => {
+      let processed = "";
+      for (let i = 0; i < value.length; i++) {
+        if ((i + 1) % 3 === 0) {
+          if (Math.random() > 0.5) {
+            processed += RANDOM_EMOJIS[Math.floor(Math.random() * RANDOM_EMOJIS.length)];
+          } else {
+            continue;
+          }
+        } else {
+          processed += value[i];
+        }
+      }
+      setNameValue(processed);
+      setPendingNameInput("");
+    }, 2000);
   };
 
   const handleEmailChange = (e: FormEvent<HTMLInputElement>) => {
@@ -664,7 +717,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* The Shy Button */}
+          {/* The Shy Button - Now INVISIBLE when you get close! */}
           <div style={{ textAlign: "center", marginBottom: "30px" }}>
             <button
               ref={buttonRef}
@@ -679,7 +732,9 @@ export default function Home() {
                 cursor: "pointer",
                 fontFamily: "Impact, sans-serif",
                 boxShadow: "10px 10px 0px #FF0000",
-                transition: "transform 0.1s",
+                transition: "opacity 0.15s, transform 0.1s",
+                opacity: buttonVisible ? 1 : 0,
+                pointerEvents: buttonVisible ? "auto" : "none",
               }}
             >
               🔥 CLAIM PRIZE NOW! 🔥
@@ -727,11 +782,21 @@ export default function Home() {
                     style={{
                       width: "150px",
                       height: "150px",
-                      backgroundColor: "#666",
+                      backgroundColor: captchaStates[index]?.clicked ? "#FF0000" : "#666",
                       border: "2px solid #888",
                       cursor: "pointer",
+                      transform: captchaStates[index]?.fled ? "translate(200px, 0) rotate(20deg)" : "none",
+                      transition: "transform 0.3s ease-out, background-color 0.2s",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "24px",
+                      fontWeight: "bold",
+                      color: captchaStates[index]?.clicked ? "#FFF" : "transparent",
                     }}
-                  />
+                  >
+                    {captchaStates[index]?.clicked ? "Nope" : ""}
+                  </button>
                 ))}
               </div>
             </div>
